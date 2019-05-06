@@ -12,9 +12,9 @@ public class FPPCharacterController : MonoBehaviour
     float accelerationSpeed = 5f;
     float horizontalSpeed = 3f;
     float groundedDistance = 0.3f;
-    float airControlMovement = 1f;
+    float airControlMovement = 1.5f;
 
-    float momentumModifier = 0.06f;
+    float momentumModifier = 0.14f;
     float momentumDeacceleration = 0.03f;
     float slideTime = .4f;
     public float forwardMomentum = 1f;
@@ -69,12 +69,7 @@ public class FPPCharacterController : MonoBehaviour
         if(playerState != PlayerState.moving) return;
 
         if(Input.GetButtonDown("Jump")) {
-            if(this.isGrounded) {
-                this.rigidBody.AddForce( (Vector3.up + 
-                                    (lastMovement.normalized / 2))
-                                     * forwardMomentum 
-                                     * jumpForce, ForceMode.Impulse);
-            }
+           this.Jump();
         }
 
         if(Input.GetButtonDown("Slide")) {
@@ -96,13 +91,29 @@ public class FPPCharacterController : MonoBehaviour
 
     }
 
+    public void Jump (float multiplier = 1)
+    {
+        if(this.isGrounded) {
+            this.rigidBody.AddForce( (Vector3.up + 
+                                (lastMovement.normalized / 2))
+                                    * forwardMomentum 
+                                    * jumpForce * multiplier, ForceMode.Impulse);
+        }
+    }
+
     public void MoveCharacter (float verticalInput, float horizontalInput)
     {
         Vector3 movement;
         Vector3 currentPosition = this.transform.position;
         float rotationY = this.transform.rotation.eulerAngles.y;
 
-        forwardMomentum = Mathf.Clamp(forwardMomentum + (verticalInput * momentumModifier * Time.fixedDeltaTime) 
+        float momentumAcceleration = 0;
+        if(isGrounded)
+        {
+            momentumAcceleration = (verticalInput * momentumModifier * Time.fixedDeltaTime);
+        }
+
+        forwardMomentum = Mathf.Clamp(forwardMomentum + momentumAcceleration
                                     - momentumDeacceleration * Time.fixedDeltaTime,
                                     1f, 2.5f);
 
@@ -153,9 +164,9 @@ public class FPPCharacterController : MonoBehaviour
         this.playerState = PlayerState.moving;
     }
 
-    public void PushBounce ()
+    public void PushBounce (float multiplier)
     {
-
+        this.Jump(multiplier);
     }
 
     public void PushInertia ()
