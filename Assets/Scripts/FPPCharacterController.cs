@@ -6,6 +6,7 @@ public class FPPCharacterController : MonoBehaviour
 {
     public Transform feet;
 
+
     Rigidbody rigidBody;
     float jumpForce = 6f;
     float accelerationSpeed = 5f;
@@ -15,9 +16,22 @@ public class FPPCharacterController : MonoBehaviour
 
     float momentumModifier = 0.06f;
     float momentumDeacceleration = 0.03f;
+    float slideTime = .4f;
     public float forwardMomentum = 1f;
 
     public Vector3 lastMovement;
+
+    public CapsuleCollider collider;
+
+    public PlayerState playerState;
+
+    public GameCamera camera;
+
+    public enum PlayerState {
+        moving,
+        sliding,
+        wallrunning,
+    }
 
     [SerializeField]
     private bool isGrounded = true; 
@@ -26,6 +40,7 @@ public class FPPCharacterController : MonoBehaviour
     void Start()
     {
         this.rigidBody = this.GetComponent<Rigidbody>();
+        this.playerState = PlayerState.moving;
     }
 
     void OnDrawGizmos()
@@ -34,8 +49,12 @@ public class FPPCharacterController : MonoBehaviour
      
     }
 
+    float verticalInput;
+    float horizontalInput;
+
     void Update ()
     {
+
         RaycastHit hit;
         if(Physics.SphereCast(feet.position, 0.55f, Vector3.down, out hit, 0.55f, LayerMask.GetMask("Floor")))
         {
@@ -45,19 +64,43 @@ public class FPPCharacterController : MonoBehaviour
         {
             isGrounded = false;
         }
+
+        // Only during movement
+        if(playerState != PlayerState.moving) return;
+
+        if(Input.GetButtonDown("Jump")) {
+            if(this.isGrounded) {
+                this.rigidBody.AddForce( (Vector3.up + 
+                                    (lastMovement.normalized / 2))
+                                     * forwardMomentum 
+                                     * jumpForce, ForceMode.Impulse);
+            }
+        }
+
+        if(Input.GetButtonDown("Slide")) {
+            if(this.isGrounded) {
+                StartCoroutine(SlideCoroutine());
+            }
+        }
+
+        verticalInput = Input.GetAxisRaw("Vertical");
+        horizontalInput = Input.GetAxisRaw("Horizontal");
     }
 
     // Update is called once per frame
     void FixedUpdate()
     {
+        if(playerState != PlayerState.moving) return;
         
-        Vector3 currentPosition = this.transform.position;
+        MoveCharacter(verticalInput, horizontalInput);
 
-        float rotationY = this.transform.rotation.eulerAngles.y;
-        float verticalInput = Input.GetAxisRaw("Vertical");
-        float horizontalInput = Input.GetAxisRaw("Horizontal");
+    }
 
+    public void MoveCharacter (float verticalInput, float horizontalInput)
+    {
         Vector3 movement;
+        Vector3 currentPosition = this.transform.position;
+        float rotationY = this.transform.rotation.eulerAngles.y;
 
         forwardMomentum = Mathf.Clamp(forwardMomentum + (verticalInput * momentumModifier * Time.fixedDeltaTime) 
                                     - momentumDeacceleration * Time.fixedDeltaTime,
@@ -84,16 +127,30 @@ public class FPPCharacterController : MonoBehaviour
         this.rigidBody.MovePosition(currentPosition + movement);
         
         lastMovement = movement;
+    }
 
-        if(Input.GetButtonDown("Jump")) {
-            if(this.isGrounded) {
-                this.rigidBody.AddForce( (Vector3.up + 
-                                    (lastMovement.normalized / 2))
-                                     * forwardMomentum 
-                                     * jumpForce, ForceMode.Impulse);
-            }
+    public IEnumerator SlideCoroutine ()
+    {
+        this.playerState = PlayerState.sliding;
+        float slideTimer = 0f;
+    
+        this.collider.height = 0.3f;
+        this.collider.center = new Vector3 (0, -0.70f, 0);
+        camera.AnimateEnterSlide();
+
+        yield return 0;
+
+        while(slideTimer < slideTime)
+        {
+            MoveCharacter(1, 0);
+            slideTimer += Time.deltaTime;
+            yield return 0;
         }
 
+        camera.AnimateExitSlide();
+        this.collider.height = 2f;
+        this.collider.center = new Vector3 (0, 0, 0);
+        this.playerState = PlayerState.moving;
     }
 
     public void PushBounce ()
