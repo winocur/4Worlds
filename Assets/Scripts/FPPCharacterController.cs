@@ -8,24 +8,33 @@ public class FPPCharacterController : MonoBehaviour
 
 
     Rigidbody rigidBody;
-    float jumpForce = 6f;
+
+    // jumping
+    float firstJumpForce = 3.6f;
+    float continuousJumpForce = 2500f;
+
     float accelerationSpeed = 5f;
-    float horizontalSpeed = 3f;
+    float horizontalSpeed = 4.5f;
     float groundedDistance = 0.3f;
     float airControlMovement = 1.5f;
 
     float momentumModifier = 0.14f;
     float momentumDeacceleration = 0.03f;
-    float slideTime = .4f;
+    float slideTime = .7f;
     public float forwardMomentum = 1f;
+    float jumpTime = 0.17f;
+    float momentumThreshold = 0.04f;
 
     public Vector3 lastMovement;
+    public bool lastGrounded;
 
     public CapsuleCollider collider;
 
     public PlayerState playerState;
 
     public GameCamera camera;
+
+    public float airTimer = 0f;
 
     public enum PlayerState {
         moving,
@@ -58,19 +67,32 @@ public class FPPCharacterController : MonoBehaviour
         RaycastHit hit;
         if(Physics.SphereCast(feet.position, 0.55f, Vector3.down, out hit, 0.55f, LayerMask.GetMask("Floor")))
         {
-            isGrounded = true;
+            if(airTimer > jumpTime || airTimer == 0)
+            {
+                isGrounded = true;
+            }
+            else
+            {
+                isGrounded = false;
+                airTimer += Time.deltaTime;
+            }
         }
         else
         {
             isGrounded = false;
+            airTimer += Time.deltaTime;
         }
+
+        CheckLanding();
+
+        lastGrounded = isGrounded;
 
         // Only during movement
         if(playerState != PlayerState.moving) return;
 
-        if(Input.GetButtonDown("Jump")) {
+        if(Input.GetButton("Jump")) {
            this.Jump();
-        }
+        } 
 
         if(Input.GetButtonDown("Slide")) {
             if(this.isGrounded) {
@@ -87,35 +109,56 @@ public class FPPCharacterController : MonoBehaviour
     {
         if(playerState != PlayerState.moving) return;
         
-        MoveCharacter(verticalInput, horizontalInput);
-
+        MoveCharacter(verticalInput, horizontalInput);        
+    
+        lastPosition = this.transform.position;
     }
 
-    public void Jump (float multiplier = 1)
+    public void Jump (float multiplier = 1, float directionDivider = 1f)
     {
-        if(this.isGrounded) {
+        if(this.isGrounded && airTimer == 0) {
+            Debug.Log("Initial jump at: " + multiplier);
+            // initial jump
+            airTimer = 0f;
             this.rigidBody.AddForce( (Vector3.up + 
-                                (lastMovement.normalized / 2))
+                                (lastMovement.normalized / directionDivider))
                                     * forwardMomentum 
-                                    * jumpForce * multiplier, ForceMode.Impulse);
-        }
+                                    * firstJumpForce
+                                    * multiplier, ForceMode.Impulse);
+
+            airTimer += Time.deltaTime;
+            
+        } else if (airTimer <= jumpTime) {
+            // timed follow up
+            this.rigidBody.AddForce(Vector3.up
+                                    * forwardMomentum 
+                                    * continuousJumpForce * multiplier * Time.deltaTime, 
+                                    ForceMode.Acceleration);
+
+        } 
+
     }
+
+    private Vector3 lastPosition;
 
     public void MoveCharacter (float verticalInput, float horizontalInput)
     {
+        float actualLandMovement = GetActualHorizontalMovementMagnitude();
+        float momentumAcceleration = (actualLandMovement * momentumModifier * Time.fixedDeltaTime);
+  
+        if(actualLandMovement > momentumThreshold)
+        {
+            forwardMomentum = Mathf.Clamp(forwardMomentum + momentumAcceleration * Time.fixedDeltaTime,
+                                    1f, 2.5f);
+        } else {
+            // if not moved, reset momentum
+            forwardMomentum = 1f;
+        }
+        
         Vector3 movement;
         Vector3 currentPosition = this.transform.position;
+    
         float rotationY = this.transform.rotation.eulerAngles.y;
-
-        float momentumAcceleration = 0;
-        if(isGrounded)
-        {
-            momentumAcceleration = (verticalInput * momentumModifier * Time.fixedDeltaTime);
-        }
-
-        forwardMomentum = Mathf.Clamp(forwardMomentum + momentumAcceleration
-                                    - momentumDeacceleration * Time.fixedDeltaTime,
-                                    1f, 2.5f);
 
         if(isGrounded)
         {
@@ -136,8 +179,18 @@ public class FPPCharacterController : MonoBehaviour
         }
 
         this.rigidBody.MovePosition(currentPosition + movement);
-        
+       
         lastMovement = movement;
+    }
+
+    private void CheckLanding ()
+    {
+        // landed
+        if (lastGrounded == false && isGrounded == true)
+        {
+            airTimer = 0f;
+            Debug.Log("Landed");
+        }
     }
 
     public IEnumerator SlideCoroutine ()
@@ -164,9 +217,15 @@ public class FPPCharacterController : MonoBehaviour
         this.playerState = PlayerState.moving;
     }
 
-    public void PushBounce (float multiplier)
+    public float GetActualHorizontalMovementMagnitude ()
     {
-        this.Jump(multiplier);
+        return (new Vector3(this.transform.position.x, 0 ,this.transform.position.z) -
+                new Vector3(lastPosition.x, 0, lastPosition.z)).magnitude;
+    }
+
+    public void PushBounce (float multiplier, float directionDivider = 1)
+    {
+        this.Jump(multiplier, directionDivider);
     }
 
     public void PushInertia ()

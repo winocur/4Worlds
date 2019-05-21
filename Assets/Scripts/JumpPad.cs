@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class JumpPad : MonoBehaviour
 {
-    public float multiplier = 2.4f;
+    public float multiplier = 5f;
     // Start is called before the first frame update
     void Start()
     {
@@ -22,7 +22,7 @@ public class JumpPad : MonoBehaviour
         if(other.gameObject.CompareTag("Player"))
         {
             FPPCharacterController controller = other.gameObject.GetComponent<FPPCharacterController>();
-            controller.PushBounce(multiplier);
+            controller.PushBounce(multiplier, 2f);
         }
     }
 }
