@@ -14,16 +14,24 @@ public class GameCamera : MonoBehaviour {
         this.initialCameraPosition = cameraObject.transform.localPosition;
     }
 
-    public void AnimateEnterSlide ()
-    {
+    public void AnimateEnterSlide ()  {
         LeanTween.moveLocal(cameraObject, this.initialCameraPosition + new Vector3(0, -1, 0), 0.3f)
                 .setEaseOutQuad();
     }
 
-    public void AnimateExitSlide ()
-    {
+    public void AnimateExitSlide () {
         LeanTween.moveLocal(cameraObject, this.initialCameraPosition, 0.3f)
                 .setEaseOutQuad();
+    }
+
+    public void AnimateEnterWallrun (bool isRight) {
+        LeanTween.rotateLocal(cameraObject, new Vector3 (0 , 0, (isRight) ? 15f : -15f), 0.5f)
+            .setEaseOutCubic();
+    }
+
+    public void AnimateExitWallrun () {
+        LeanTween.rotateLocal(cameraObject, new Vector3 (0 , 0, 0), 0.5f)
+            .setEaseOutCubic();
     }
 
 }

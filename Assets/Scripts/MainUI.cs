@@ -7,6 +7,7 @@ public class MainUI : MonoBehaviour
 {
     public FPPCharacterController player;
     public Text momentumText;
+    public Text stateText;
 
     // Start is called before the first frame update
     void Start()
@@ -18,5 +19,6 @@ public class MainUI : MonoBehaviour
     void Update()
     {
         momentumText.text = "Momentum: " + player.forwardMomentum;
+        stateText.text = "State: " + player.playerState;
     }
 }
