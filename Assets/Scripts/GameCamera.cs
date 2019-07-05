@@ -13,6 +13,16 @@ public class GameCamera : MonoBehaviour {
     {
         this.initialCameraPosition = cameraObject.transform.localPosition;
     }
+    
+    public void AnimateBraceForJump (float braceTime)  {
+        LeanTween.moveLocal(cameraObject, this.initialCameraPosition + new Vector3(0, -0.4f, 0), braceTime)
+                .setEaseOutQuad();
+    }
+
+    public void AnimateJump (float jumpTime)  {
+        LeanTween.moveLocal(cameraObject, this.initialCameraPosition, jumpTime)
+                .setEaseInQuad();
+    }
 
     public void AnimateEnterSlide ()  {
         LeanTween.moveLocal(cameraObject, this.initialCameraPosition + new Vector3(0, -1, 0), 0.3f)

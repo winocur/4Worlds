@@ -29,7 +29,9 @@ public class FPPCharacterController : MonoBehaviour
 
     float wallrunCheckerDistance = 1.5f;
     float wallrunGravity = -7f;
-    public GameObject lastWallrunObject = null;
+    public float wallrunExitTimer = -1f;
+    float wallrunExitJumpTime = 0.6f;
+    WallrunHit lastWallrunHit;
 
     float mouseSensitivityX = 4f;
 
@@ -92,6 +94,10 @@ public class FPPCharacterController : MonoBehaviour
             airTimer += Time.deltaTime;
         }
 
+        if(wallrunExitTimer >= 0) {
+            wallrunExitTimer += Time.deltaTime;
+        }
+
         CheckLanding();
 
         lastGrounded = isGrounded;
@@ -99,7 +105,7 @@ public class FPPCharacterController : MonoBehaviour
         // Only during movement
         if(playerState == PlayerState.moving) {
             if(Input.GetButton("Jump")) {
-                this.Jump();
+                this.EnterJump();
             }    
 
             if(Input.GetButtonDown("Slide")) {
@@ -111,10 +117,11 @@ public class FPPCharacterController : MonoBehaviour
             verticalInput = Input.GetAxisRaw("Vertical");
             horizontalInput = Input.GetAxisRaw("Horizontal");
 
+            // X mouse look
             float xRotation = Input.GetAxis("Mouse X") * mouseSensitivityX;
             Quaternion xQuaternion = Quaternion.AngleAxis (xRotation, Vector3.up);
             this.transform.rotation *= xQuaternion;
-            //this.transform.Rotate(new Vector3(0, xRotation, 0));
+    
         } else if (playerState == PlayerState.wallrunning) {
             if(!Input.GetButton("Jump")) {
                 this.ExitWallrunning();
@@ -139,6 +146,15 @@ public class FPPCharacterController : MonoBehaviour
         lastPosition = this.transform.position;
     }
 
+    public void EnterJump () {
+        float braceTime = 0.3f;
+        float impulseTime = 0.1f;
+
+        this.camera.AnimateBraceForJump(braceTime);
+        LeanTween.delayedCall(braceTime, () => this.camera.AnimateJump(impulseTime));
+        LeanTween.delayedCall(braceTime = impulseTime, () => Jump());
+    }
+
     public void Jump (float multiplier = 1, float directionDivider = 1f)
     {
         if(this.isGrounded && airTimer == 0) {
@@ -153,6 +169,9 @@ public class FPPCharacterController : MonoBehaviour
 
             airTimer += Time.deltaTime;
             
+        } else if (wallrunExitTimer >= 0 && wallrunExitTimer <= wallrunExitJumpTime) {
+            Debug.Log("Entering Wallrun Jump");
+            EnterWallrunJump ();
         } else if (airTimer <= jumpTime) {
             // timed follow up
             this.rigidBody.AddForce(Vector3.up
@@ -181,14 +200,13 @@ public class FPPCharacterController : MonoBehaviour
         Debug.DrawRay(feet.position, this.transform.rotation * Vector3.left * wallrunCheckerDistance, Color.green);
         Debug.DrawRay(feet.position, this.transform.rotation * Vector3.right * wallrunCheckerDistance, Color.cyan);
         
-        
         if(Physics.Raycast(feet.position, this.transform.rotation * Vector3.left, out hit, wallrunCheckerDistance, LayerMask.GetMask("Wall"))) {
             hitObject = new WallrunHit {
                 obj = hit.transform.gameObject,
                 isRight = false,
-                moveVector = Quaternion.Euler(0, -90f, 0) * hit.normal
+                moveVector = Quaternion.Euler(0, -90f, 0) * hit.normal,
+                normalVector = hit.normal,
             };
-            Debug.Log("Wallrun left");
             
             return true;
         } 
@@ -198,9 +216,9 @@ public class FPPCharacterController : MonoBehaviour
             hitObject = new WallrunHit {
                 obj = hit.transform.gameObject,
                 isRight = true,
-                moveVector = Quaternion.Euler(0, 90f, 0) * hit.normal
+                moveVector = Quaternion.Euler(0, 90f, 0) * hit.normal,
+                normalVector = hit.normal,
             };
-            Debug.Log("Wallrun right");
             return true;
         }
 
@@ -211,7 +229,7 @@ public class FPPCharacterController : MonoBehaviour
 
     private void EnterWallrunning (WallrunHit wallrunHit) {
 
-        if(wallrunHit.obj == lastWallrunObject) return;
+        if(wallrunHit.obj == lastWallrunHit.obj) return;
 
         this.playerState = PlayerState.wallrunning;
         Vector3 currentVelocity = this.rigidBody.velocity;
@@ -221,7 +239,7 @@ public class FPPCharacterController : MonoBehaviour
         LeanTween.rotate(this.gameObject, Quaternion.LookRotation(wallrunHit.moveVector, Vector3.up).eulerAngles, 0.3f);
 
         this.currentGravity = wallrunGravity;
-        lastWallrunObject = wallrunHit.obj;
+        lastWallrunHit = wallrunHit;
 
     }
 
@@ -231,7 +249,28 @@ public class FPPCharacterController : MonoBehaviour
         this.currentGravity = gravity;
         this.camera.AnimateExitWallrun();
         this.playerState = PlayerState.moving;
+        wallrunExitTimer = 0.01f;
     }
+
+    private void EnterWallrunJump () {
+        wallrunExitTimer = -1;
+
+        
+
+        WallrunHit hit;
+        if(this.CheckWallrun(out hit)) {
+            Vector3 outJumpDirection = hit.normalVector + hit.normalVector + lastMovement.normalized;
+            LeanTween.rotate(this.gameObject, Quaternion.LookRotation(outJumpDirection, Vector3.up).eulerAngles, 0.22f).setEaseOutCirc(); //.setOnComplete(
+            //() => {
+                this.isGrounded = true;
+                this.airTimer = 0f;
+                lastMovement = outJumpDirection;
+                Jump(1f * forwardMomentum);
+            //});
+        }
+    }
+
+        
 
     private Vector3 lastPosition;
 
@@ -290,8 +329,9 @@ public class FPPCharacterController : MonoBehaviour
         if (lastGrounded == false && isGrounded == true)
         {
             airTimer = 0f;
+            wallrunExitTimer = -1f;
             Debug.Log("Landed");
-            lastWallrunObject = null;
+            lastWallrunHit.obj = null;
         }
     }
 
@@ -342,4 +382,5 @@ struct WallrunHit {
     public bool isRight;
     public GameObject obj;
     public Vector3 moveVector;
+    public Vector3 normalVector;
 }
