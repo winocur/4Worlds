@@ -31,6 +31,9 @@ public class FPPCharacterController : MonoBehaviour
     float wallrunGravity = -7f;
     public GameObject lastWallrunObject = null;
 
+    float mouseSensitivityX = 4f;
+
+
     public Vector3 lastMovement;
     public bool lastGrounded;
 
@@ -39,8 +42,6 @@ public class FPPCharacterController : MonoBehaviour
     public PlayerState playerState;
 
     public GameCamera camera;
-
-    public MouseLook mouseLookX;
 
     public float airTimer = 0f;
 
@@ -109,6 +110,11 @@ public class FPPCharacterController : MonoBehaviour
 
             verticalInput = Input.GetAxisRaw("Vertical");
             horizontalInput = Input.GetAxisRaw("Horizontal");
+
+            float xRotation = Input.GetAxis("Mouse X") * mouseSensitivityX;
+            Quaternion xQuaternion = Quaternion.AngleAxis (xRotation, Vector3.up);
+            this.transform.rotation *= xQuaternion;
+            //this.transform.Rotate(new Vector3(0, xRotation, 0));
         } else if (playerState == PlayerState.wallrunning) {
             if(!Input.GetButton("Jump")) {
                 this.ExitWallrunning();
@@ -211,8 +217,7 @@ public class FPPCharacterController : MonoBehaviour
         Vector3 currentVelocity = this.rigidBody.velocity;
         this.rigidBody.velocity = new Vector3(currentVelocity.x, 6.2f, currentVelocity.z);
         this.camera.AnimateEnterWallrun(wallrunHit.isRight);
-        mouseLookX.enabled = false;
-
+        
         LeanTween.rotate(this.gameObject, Quaternion.LookRotation(wallrunHit.moveVector, Vector3.up).eulerAngles, 0.3f);
 
         this.currentGravity = wallrunGravity;
@@ -222,10 +227,10 @@ public class FPPCharacterController : MonoBehaviour
 
     private void ExitWallrunning () {
         Debug.Log("Exit wallrunning");
-        this.playerState = PlayerState.moving;
+        
         this.currentGravity = gravity;
         this.camera.AnimateExitWallrun();
-        LeanTween.delayedCall(0.5f, () => { mouseLookX.enabled = true; });
+        this.playerState = PlayerState.moving;
     }
 
     private Vector3 lastPosition;
