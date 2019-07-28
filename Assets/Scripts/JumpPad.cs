@@ -5,18 +5,8 @@ using UnityEngine;
 public class JumpPad : MonoBehaviour
 {
     public float multiplier = 5f;
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
+    // Jump pad sends the player flying in the direction of their current movement
     void OnCollisionEnter (Collision other)
     {
         if(other.gameObject.CompareTag("Player"))

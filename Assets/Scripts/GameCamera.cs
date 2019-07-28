@@ -14,6 +14,7 @@ public class GameCamera : MonoBehaviour {
         this.initialCameraPosition = cameraObject.transform.localPosition;
     }
     
+    #region ANIMATIONS 
     public void AnimateBraceForJump (float braceTime)  {
         LeanTween.moveLocal(cameraObject, this.initialCameraPosition + new Vector3(0, -0.4f, 0), braceTime)
                 .setEaseOutQuad();
@@ -43,5 +44,6 @@ public class GameCamera : MonoBehaviour {
         LeanTween.rotateLocal(cameraObject, new Vector3 (0 , 0, 0), 0.5f)
             .setEaseOutCubic();
     }
+    #endregion
 
 }

@@ -5,11 +5,9 @@ using UnityEngine;
 public class FPPCharacterController : MonoBehaviour
 {
     public Transform feet;
+    public PlayerState State { get; set; }
 
-
-    Rigidbody rigidBody;
-
-    // jumping
+    #region CONFIGURATION VARIABLES
     float firstJumpForce = 5.8f;
     float continuousJumpForce = 2500f;
 
@@ -31,22 +29,19 @@ public class FPPCharacterController : MonoBehaviour
     float wallrunGravity = -7f;
     public float wallrunExitTimer = -1f;
     float wallrunExitJumpTime = 0.6f;
-    WallrunHit lastWallrunHit;
-
     float mouseSensitivityX = 4f;
+    #endregion
 
+    WallrunHit lastWallrunHit;
+    Rigidbody rigidBody;
+    float airTimer = 0f;
 
-    public Vector3 lastMovement;
-    public bool lastGrounded;
+    Vector3 lastMovement;
+    bool lastGrounded;
+    CapsuleCollider collider;
+    GameCamera camera;
 
-    public CapsuleCollider collider;
-
-    public PlayerState playerState;
-
-    public GameCamera camera;
-
-    public float airTimer = 0f;
-
+    
     public enum PlayerState {
         moving,
         sliding,
@@ -60,7 +55,7 @@ public class FPPCharacterController : MonoBehaviour
     void Start()
     {
         this.rigidBody = this.GetComponent<Rigidbody>();
-        this.playerState = PlayerState.moving;
+        this.State = PlayerState.moving;
         this.currentGravity = gravity;
     }
 
@@ -76,20 +71,14 @@ public class FPPCharacterController : MonoBehaviour
     {
 
         RaycastHit hit;
-        if(Physics.SphereCast(feet.position, 0.55f, Vector3.down, out hit, 0.55f, LayerMask.GetMask("Floor")))
-        {
-            if(airTimer > jumpTime || airTimer == 0)
-            {
+        if(Physics.SphereCast(feet.position, 0.55f, Vector3.down, out hit, 0.55f, LayerMask.GetMask("Floor"))) {
+            if(airTimer > jumpTime || airTimer == 0) {
                 isGrounded = true;
-            }
-            else
-            {
+            } else {
                 isGrounded = false;
                 airTimer += Time.deltaTime;
             }
-        }
-        else
-        {
+        } else {
             isGrounded = false;
             airTimer += Time.deltaTime;
         }
@@ -102,8 +91,9 @@ public class FPPCharacterController : MonoBehaviour
 
         lastGrounded = isGrounded;
 
+        // Input checking
         // Only during movement
-        if(playerState == PlayerState.moving) {
+        if(this.State == PlayerState.moving) {
             if(Input.GetButton("Jump")) {
                 this.EnterJump();
             }    
@@ -122,7 +112,7 @@ public class FPPCharacterController : MonoBehaviour
             Quaternion xQuaternion = Quaternion.AngleAxis (xRotation, Vector3.up);
             this.transform.rotation *= xQuaternion;
     
-        } else if (playerState == PlayerState.wallrunning) {
+        } else if (this.State == PlayerState.wallrunning) {
             if(!Input.GetButton("Jump")) {
                 this.ExitWallrunning();
             }    
@@ -138,8 +128,8 @@ public class FPPCharacterController : MonoBehaviour
     // Update is called once per frame
     void FixedUpdate()
     {
-        if(playerState != PlayerState.moving &&
-        playerState != PlayerState.wallrunning) return;
+        if(this.State != PlayerState.moving &&
+        this.State != PlayerState.wallrunning) return;
         
         MoveCharacter(verticalInput, horizontalInput);        
     
@@ -155,6 +145,7 @@ public class FPPCharacterController : MonoBehaviour
         LeanTween.delayedCall(braceTime = impulseTime, () => Jump());
     }
 
+    /// Jump if grounded or exiting a wallrun
     public void Jump (float multiplier = 1, float directionDivider = 1f)
     {
         if(this.isGrounded && airTimer == 0) {
@@ -182,7 +173,7 @@ public class FPPCharacterController : MonoBehaviour
         } else {
 
             // check for wallrun
-            if(this.playerState == PlayerState.moving)  {
+            if(this.State == PlayerState.moving)  {
                 WallrunHit hit;
                 if(CheckWallrun(out hit)) {
                     Debug.DrawRay(this.transform.position, hit.moveVector, Color.magenta, 5f);
@@ -194,6 +185,7 @@ public class FPPCharacterController : MonoBehaviour
 
     }
 
+    /// Uses raycasts to check wether we should enter wall run
     private bool CheckWallrun (out WallrunHit hitObject) {
         RaycastHit hit;
         
@@ -227,11 +219,14 @@ public class FPPCharacterController : MonoBehaviour
         return false;
     }
 
+    /// enters wallrunnign against a wall.
+    /// We save the wallrun hit info so we dont wallrun twice into the
+    /// same wall without touching ground
     private void EnterWallrunning (WallrunHit wallrunHit) {
 
         if(wallrunHit.obj == lastWallrunHit.obj) return;
 
-        this.playerState = PlayerState.wallrunning;
+        this.State = PlayerState.wallrunning;
         Vector3 currentVelocity = this.rigidBody.velocity;
         this.rigidBody.velocity = new Vector3(currentVelocity.x, 6.2f, currentVelocity.z);
         this.camera.AnimateEnterWallrun(wallrunHit.isRight);
@@ -244,19 +239,16 @@ public class FPPCharacterController : MonoBehaviour
     }
 
     private void ExitWallrunning () {
-        Debug.Log("Exit wallrunning");
-        
         this.currentGravity = gravity;
         this.camera.AnimateExitWallrun();
-        this.playerState = PlayerState.moving;
+        this.State = PlayerState.moving;
         wallrunExitTimer = 0.01f;
     }
 
+    /// The player can jump from wallrunning into a plataform or another wallrun
+    /// As long as they tap space after releasing withing the wallrunExitTiemr
     private void EnterWallrunJump () {
         wallrunExitTimer = -1;
-
-        
-
         WallrunHit hit;
         if(this.CheckWallrun(out hit)) {
             Vector3 outJumpDirection = hit.normalVector + hit.normalVector + lastMovement.normalized;
@@ -270,10 +262,9 @@ public class FPPCharacterController : MonoBehaviour
         }
     }
 
-        
-
     private Vector3 lastPosition;
 
+    /// regular character movement and air control
     public void MoveCharacter (float verticalInput, float horizontalInput)
     {
         float actualLandMovement = GetActualHorizontalMovementMagnitude();
@@ -294,7 +285,7 @@ public class FPPCharacterController : MonoBehaviour
         float rotationY = this.transform.rotation.eulerAngles.y;
 
         // regular movement
-        if(isGrounded || this.playerState == PlayerState.wallrunning)
+        if(isGrounded || this.State == PlayerState.wallrunning)
         {
             movement = (Quaternion.AngleAxis(rotationY, Vector3.up) * 
                     new Vector3(horizontalInput * horizontalSpeed * Time.fixedDeltaTime
@@ -323,6 +314,8 @@ public class FPPCharacterController : MonoBehaviour
         lastMovement = movement;
     }
 
+    // Checks when the player has become grounded
+    // And resets grounding related timers and wallrun hit memory
     private void CheckLanding ()
     {
         // landed
@@ -330,14 +323,14 @@ public class FPPCharacterController : MonoBehaviour
         {
             airTimer = 0f;
             wallrunExitTimer = -1f;
-            Debug.Log("Landed");
             lastWallrunHit.obj = null;
         }
     }
 
+    // Slides under objects
     public IEnumerator SlideCoroutine ()
     {
-        this.playerState = PlayerState.sliding;
+        this.State = PlayerState.sliding;
         float slideTimer = 0f;
     
         this.collider.height = 0.3f;
@@ -356,7 +349,7 @@ public class FPPCharacterController : MonoBehaviour
         camera.AnimateExitSlide();
         this.collider.height = 2f;
         this.collider.center = new Vector3 (0, 0, 0);
-        this.playerState = PlayerState.moving;
+        this.State = PlayerState.moving;
     }
 
     public float GetActualHorizontalMovementMagnitude ()
@@ -365,17 +358,12 @@ public class FPPCharacterController : MonoBehaviour
                 new Vector3(lastPosition.x, 0, lastPosition.z)).magnitude;
     }
 
+    /// External call to make the player jump in the direction of their movement
+    /// with an optional multiplier
     public void PushBounce (float multiplier, float directionDivider = 1)
     {
         this.Jump(multiplier, directionDivider);
     }
-
-    public void PushInertia ()
-    {
-
-    }
-
-
 }
 
 struct WallrunHit {

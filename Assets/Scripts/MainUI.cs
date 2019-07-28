@@ -9,16 +9,10 @@ public class MainUI : MonoBehaviour
     public Text momentumText;
     public Text stateText;
 
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
     // Update is called once per frame
     void Update()
     {
         momentumText.text = "Momentum: " + player.forwardMomentum;
-        stateText.text = "State: " + player.playerState;
+        stateText.text    = "State: " + player.State;
     }
 }
